@@ -77,9 +77,9 @@
 
     <Grid Background="{StaticResource WindowBackground}">
 
-        <!-- ============================================ -->
+       
         <!-- PAGE 1: HOME / START PAGE -->
-        <!-- ============================================ -->
+        
         <Grid x:Name="home_grid" Visibility="Visible">
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
 
@@ -133,9 +133,9 @@
             </StackPanel>
         </Grid>
 
-        <!-- ============================================ -->
+        
         <!-- PAGE 2: USERNAME INPUT PAGE -->
-        <!-- ============================================ -->
+        
         <Grid x:Name="username_grid" Visibility="Hidden">
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Width="400">
 
@@ -186,9 +186,9 @@
             </StackPanel>
         </Grid>
 
-        <!-- ============================================ -->
+        
         <!-- PAGE 3: CHAT PAGE -->
-        <!-- ============================================ -->
+       
         <Grid x:Name="chat_grid" Visibility="Hidden">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>

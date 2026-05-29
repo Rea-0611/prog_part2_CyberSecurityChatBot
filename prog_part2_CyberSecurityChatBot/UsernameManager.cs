@@ -7,10 +7,12 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace prog_part2_CyberSecurityChatBot
-{
+{//start of namespace
     public class UsernameManager
-    {
-            private string currentUsername = string.Empty;
+    {//start of class
+
+        // This class manages user information, including usernames and their interests. It handles reading and writing to files to persist user data across sessions.
+        private string currentUsername = string.Empty;
             private string userFile = "users.txt";
             private string interestsFile = "user_interests.txt";
             private int messageCounter = 0;
@@ -26,7 +28,8 @@ namespace prog_part2_CyberSecurityChatBot
                 set { messageCounter = value; }
             }
 
-            public bool ProcessUsername(string enteredName, out string welcomeMessage, out bool isNewUser)
+        //create a method that takes the entered username, checks if it exists in the users.txt file, and returns a welcome message accordingly. If the username is new, it should be added to the file and a welcome message for new users should be returned. If the username already exists, a welcome back message should be returned.
+        public bool ProcessUsername(string enteredName, out string welcomeMessage, out bool isNewUser)
             {
                 isNewUser = false;
 
@@ -70,8 +73,8 @@ namespace prog_part2_CyberSecurityChatBot
                 }
                 return false;
             }
-
-            public void SaveUserInterest(string input)
+        //create a method that takes the user input and extracts the interests from it, then saves them to the interests file in the format "username interested in: interest1, interest2, interest3"
+        public void SaveUserInterest(string input)
             {
                 string lowerInput = input.ToLower();
                 string[] words = lowerInput.Split(' ');
@@ -122,8 +125,8 @@ namespace prog_part2_CyberSecurityChatBot
                     }
                 }
             }
-
-            public string GetSavedInterests()
+        //create a method that retrieves the saved interests for the current user from the interests file and returns them as a string
+        public string GetSavedInterests()
             {
                 if (File.Exists(interestsFile))
                 {
@@ -152,5 +155,5 @@ namespace prog_part2_CyberSecurityChatBot
             {
                 return messageCounter > 0 && messageCounter % 5 == 0;
             }
-        }
-    }
+    }//end of class
+}//end of namespace

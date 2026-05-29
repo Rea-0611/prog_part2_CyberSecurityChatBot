@@ -15,9 +15,9 @@ using System.Windows.Shapes;
 
 
 namespace prog_part2_CyberSecurityChatBot
-{
+{//start of namespace
     public partial class MainWindow : Window
-    {
+    {//start of class
         // Move these to class level (outside constructor)
         private GreetingManager greetingManager;
         private UsernameManager usernameManager;
@@ -79,5 +79,5 @@ namespace prog_part2_CyberSecurityChatBot
         {
             uiManager.ProcessUserQuestion(question.Text, chats, question);
         }
-    }
-}
+    }//end of class
+}//end of namespace

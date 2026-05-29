@@ -11,9 +11,9 @@ namespace prog_part2_CyberSecurityChatBot
 {
     public class UIManager
     {
-            // ============================================
+           
             // UI REFERENCES (set from MainWindow)
-            // ============================================
+            
             private Grid homeGrid;
             private Grid usernameGrid;
             private Grid chatGrid;
@@ -24,9 +24,9 @@ namespace prog_part2_CyberSecurityChatBot
             private UsernameManager usernameManager;
             private ResponseManager responseManager;
 
-            // ============================================
+            
             // CONSTRUCTOR
-            // ============================================
+           
             public UIManager(UsernameManager userMgr, ResponseManager respMgr)
             {
                 usernameManager = userMgr;
@@ -43,9 +43,9 @@ namespace prog_part2_CyberSecurityChatBot
                 errorMessageText = error;
             }
 
-            // ============================================
+            
             // NAVIGATION METHODS (was Class 2)
-            // ============================================
+            
             public void ShowHomePage()
             {
                 ShowPage(homeGrid, usernameGrid, chatGrid);
@@ -78,9 +78,9 @@ namespace prog_part2_CyberSecurityChatBot
                 return chatGrid != null && chatGrid.Visibility == Visibility.Visible;
             }
 
-            // ============================================
+            
             // UI METHODS (chat bubbles, scrolling, etc.)
-            // ============================================
+            
             public void AddUserMessage(string username, string message, ListView chatDisplay)
             {
                 var chatItem = new
@@ -123,6 +123,7 @@ namespace prog_part2_CyberSecurityChatBot
                 ScrollToBottom(chatDisplay);
             }
 
+
             private void ScrollToBottom(ListView chatDisplay)
             {
                 if (chatDisplay.Items.Count > 0)
@@ -153,9 +154,9 @@ namespace prog_part2_CyberSecurityChatBot
                     errorMessageText.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
             }
 
-            // ============================================
+          
             // CHAT PROCESSING METHODS (was Class 5)
-            // ============================================
+           
             public void ProcessUserQuestion(string questionText, ListView chatDisplay, TextBox inputBox)
             {
                 // Validate input
@@ -209,7 +210,8 @@ namespace prog_part2_CyberSecurityChatBot
                 AddBotMessage(responseManager.GetHelpMessage(), chatDisplay);
             }
 
-            public void ProcessUsernameSubmission(string enteredName, ListView chatDisplay, TextBox inputBox)
+        // USERNAME PROCESSING METHOD (was Class 3)
+        public void ProcessUsernameSubmission(string enteredName, ListView chatDisplay, TextBox inputBox)
             {
                 string welcomeMessage;
                 bool isNewUser;

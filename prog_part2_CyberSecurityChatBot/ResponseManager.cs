@@ -5,6 +5,8 @@ namespace prog_part2_CyberSecurityChatBot
 {
     public class ResponseManager
     {
+
+        // This class manages the chatbot's responses based on user input. It includes sentiment analysis to provide empathetic responses and a variety of tips and information on cybersecurity topics. The class uses dictionaries to store responses for different topics and sentiments, allowing for dynamic and context-aware interactions with the user.
         private Dictionary<string, List<string>> topicResponses;
         private Dictionary<string, string[]> sentimentKeywords;
         private Dictionary<string, List<string>> sentimentResponses;
@@ -17,6 +19,7 @@ namespace prog_part2_CyberSecurityChatBot
             set { lastTopic = value; }
         }
 
+        // Constructor to initialize responses and sentiment keywords
         public ResponseManager()
         {
             InitializeSentimentKeywords();
@@ -24,6 +27,7 @@ namespace prog_part2_CyberSecurityChatBot
             InitializeResponses();
         }
 
+        // Initialize keywords for sentiment analysis
         private void InitializeSentimentKeywords()
         {
             sentimentKeywords = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
@@ -38,6 +42,7 @@ namespace prog_part2_CyberSecurityChatBot
             };
         }
 
+        // Initialize responses for different sentiments
         private void InitializeSentimentResponses()
         {
             sentimentResponses = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase)
@@ -94,6 +99,7 @@ namespace prog_part2_CyberSecurityChatBot
             };
         }
 
+        // Initialize responses for different topics
         private void InitializeResponses()
         {
             topicResponses = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase)
