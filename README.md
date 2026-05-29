@@ -262,7 +262,7 @@ The video (8–10 minutes) covers:
 
 ⚠️ The video uses my own voice (no AI voice) and is unlisted as required.
 
-Youtube link to video: 
+Youtube link to video: https://youtu.be/NLM3fG6D0z0
 
 ---
 
