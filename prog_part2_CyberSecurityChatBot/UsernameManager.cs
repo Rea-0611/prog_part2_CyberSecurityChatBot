@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace prog_part2_CyberSecurityChatBot
 {
-    internal class UsernameManager
+    public class UsernameManager
     {
             private string currentUsername = string.Empty;
             private string userFile = "users.txt";

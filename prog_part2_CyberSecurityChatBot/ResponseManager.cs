@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace prog_part2_CyberSecurityChatBot
 {
-    internal class ResponseManager
+    public class ResponseManager
     {
             private Dictionary<string, List<string>> topicResponses;
             private Random random = new Random();

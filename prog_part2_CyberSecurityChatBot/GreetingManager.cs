@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace prog_part2_CyberSecurityChatBot
 {
-    internal class GreetingManager
+    public class GreetingManager
     {
 
         private string audioPath;
