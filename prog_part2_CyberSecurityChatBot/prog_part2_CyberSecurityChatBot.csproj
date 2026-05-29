@@ -55,6 +55,10 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="GreetingManager.cs" />
+    <Compile Include="ResponseManager.cs" />
+    <Compile Include="UIManager.cs" />
+    <Compile Include="UsernameManager.cs" />
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
