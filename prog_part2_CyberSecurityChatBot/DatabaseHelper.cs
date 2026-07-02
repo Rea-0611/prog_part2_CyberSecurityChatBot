@@ -1,350 +1,308 @@
-﻿using Org.BouncyCastle.Tls;
-using System;
+﻿using System;
 using System.Data;
 using System.Data.SqlClient;
-using System.Runtime.Remoting.Contexts;
-using System.Windows.Markup;
 
 namespace prog_part2_CyberSecurityChatBot
 {
     public class DatabaseHelper
     {
-        private string connectionString;
+        // Connection string targeting your LocalDB instance with the mandatory security trust parameters
+        private readonly string connectionString = @"Server=(localdb)\MSSQLLocalDB;Database=cybersecurity_chatbot;Trusted_Connection=True;TrustServerCertificate=True;";
 
-        public DatabaseHelper()
-        {
-            // UPDATE THIS FOR YOUR SQL SERVER
-            // For Windows Authentication:
-            connectionString = @"(localdb)\MSSQLLocalDB; Initial Catalog = master; Integrated Security = True; Connect Timeout = 30; Encrypt = False; Trust Server Certificate = False; Application Intent = ReadWrite; Multi Subnet Failover = False;";
-
-            // For SQL Server Authentication:
-            // connectionString = "Server=localhost;Database=cybersecurity_chatbot;User Id=sa;Password=yourpassword;";
-        }
-
+        // 1. Connection Test method used at application startup
         public bool TestConnection()
         {
-            try
+            using (SqlConnection conn = new SqlConnection(connectionString))
             {
-                using (var conn = new SqlConnection(connectionString))
+                try
                 {
                     conn.Open();
                     return true;
                 }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Connection failed: {ex.Message}");
-                return false;
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("Startup Connection Test Failed: " + ex.Message);
+                    return false;
+                }
             }
         }
 
-        // ============================================
-        // TASK OPERATIONS
-        // ============================================
+        // ==========================================
+        // ACTIVITY LOG METHODS (Handles any inputs!)
+        // ==========================================
 
-        public bool AddTask(string username, string title, string description, DateTime? reminderDate)
+        public void AddActivityLog(string username, string action, string details)
         {
-            try
+            string query = "INSERT INTO activity_log (username, action, details) VALUES (@username, @action, @details);";
+
+            using (SqlConnection conn = new SqlConnection(connectionString))
             {
-                using (var conn = new SqlConnection(connectionString))
+                using (SqlCommand cmd = new SqlCommand(query, conn))
                 {
-                    conn.Open();
-                    string query = @"INSERT INTO tasks (username, title, description, reminder_date) 
-                                    VALUES (@username, @title, @description, @reminderDate)";
-                    using (var cmd = new SqlCommand(query, conn))
+                    cmd.Parameters.Add("@username", SqlDbType.NVarChar, 100).Value = username ?? "Unknown";
+                    cmd.Parameters.Add("@action", SqlDbType.NVarChar, 255).Value = action ?? "";
+                    cmd.Parameters.Add("@details", SqlDbType.NVarChar, -1).Value = details ?? "";
+
+                    try
                     {
-                        cmd.Parameters.AddWithValue("@username", username);
-                        cmd.Parameters.AddWithValue("@title", title);
-                        cmd.Parameters.AddWithValue("@description", description ?? "");
-                        cmd.Parameters.AddWithValue("@reminderDate", (object)reminderDate ?? DBNull.Value);
-                        return cmd.ExecuteNonQuery() > 0;
+                        conn.Open();
+                        cmd.ExecuteNonQuery();
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine("Error in AddActivityLog: " + ex.Message);
                     }
                 }
             }
-            catch (Exception ex)
+        }
+
+        public DataTable GetRecentActivity(string username, int limit)
+        {
+            DataTable dt = new DataTable();
+            string query = "SELECT TOP (@limit) id, username, action, details, timestamp FROM activity_log WHERE username = @username ORDER BY timestamp DESC;";
+
+            using (SqlConnection conn = new SqlConnection(connectionString))
             {
-                System.Diagnostics.Debug.WriteLine($"AddTask Error: {ex.Message}");
-                return false;
+                using (SqlCommand cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.Add("@username", SqlDbType.NVarChar, 100).Value = username ?? "Unknown";
+                    cmd.Parameters.Add("@limit", SqlDbType.Int).Value = limit;
+
+                    using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
+                    {
+                        try
+                        {
+                            conn.Open();
+                            adapter.Fill(dt);
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine("Error in GetRecentActivity: " + ex.Message);
+                        }
+                    }
+                }
+            }
+            return dt;
+        }
+
+        public DataTable GetActivityByDate(string username, DateTime fromDate, DateTime toDate)
+        {
+            DataTable dt = new DataTable();
+            string query = "SELECT id, username, action, details, timestamp FROM activity_log WHERE username = @username AND timestamp BETWEEN @fromDate AND @toDate ORDER BY timestamp DESC;";
+
+            using (SqlConnection conn = new SqlConnection(connectionString))
+            {
+                using (SqlCommand cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.Add("@username", SqlDbType.NVarChar, 100).Value = username ?? "Unknown";
+                    cmd.Parameters.Add("@fromDate", SqlDbType.DateTime).Value = fromDate;
+                    cmd.Parameters.Add("@toDate", SqlDbType.DateTime).Value = toDate;
+
+                    using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
+                    {
+                        try
+                        {
+                            conn.Open();
+                            adapter.Fill(dt);
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine("Error in GetActivityByDate: " + ex.Message);
+                        }
+                    }
+                }
+            }
+            return dt;
+        }
+
+        public bool ClearActivityLog(string username)
+        {
+            string query = "DELETE FROM activity_log WHERE username = @username;";
+
+            using (SqlConnection conn = new SqlConnection(connectionString))
+            {
+                using (SqlCommand cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.Add("@username", SqlDbType.NVarChar, 100).Value = username ?? "Unknown";
+
+                    try
+                    {
+                        conn.Open();
+                        int rowsAffected = cmd.ExecuteNonQuery();
+                        return rowsAffected > 0;
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine("Error in ClearActivityLog: " + ex.Message);
+                        return false;
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // TASK MANAGEMENT METHODS
+        // ==========================================
+
+        public bool AddTask(string username, string title, string description, DateTime? reminderDate)
+        {
+            string query = "INSERT INTO tasks (username, title, description, reminder_date, is_completed) VALUES (@username, @title, @description, @reminderDate, 0);";
+
+            using (SqlConnection conn = new SqlConnection(connectionString))
+            {
+                using (SqlCommand cmd = new SqlCommand(query, conn))
+                {
+                    cmd.Parameters.Add("@username", SqlDbType.NVarChar, 100).Value = username ?? "Unknown";
+                    cmd.Parameters.Add("@title", SqlDbType.NVarChar, 200).Value = title ?? "";
+                    cmd.Parameters.Add("@description", SqlDbType.NVarChar, -1).Value = description ?? "";
+                    cmd.Parameters.Add("@reminderDate", SqlDbType.DateTime).Value = (object)reminderDate ?? DBNull.Value;
+
+                    try
+                    {
+                        conn.Open();
+                        return cmd.ExecuteNonQuery() > 0;
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine("Error in AddTask: " + ex.Message);
+                        return false;
+                    }
+                }
             }
         }
 
         public DataTable GetTasks(string username)
         {
-            var dataTable = new DataTable();
-            try
+            DataTable dt = new DataTable();
+            string query = "SELECT id, title, description, reminder_date, is_completed, created_at FROM tasks WHERE username = @username ORDER BY created_at DESC;";
+
+            using (SqlConnection conn = new SqlConnection(connectionString))
             {
-                using (var conn = new SqlConnection(connectionString))
+                using (SqlCommand cmd = new SqlCommand(query, conn))
                 {
-                    conn.Open();
-                    string query = @"SELECT id, title, description, reminder_date, is_completed, created_at 
-                                    FROM tasks WHERE username = @username ORDER BY created_at DESC";
-                    using (var cmd = new SqlCommand(query, conn))
+                    cmd.Parameters.Add("@username", SqlDbType.NVarChar, 100).Value = username ?? "Unknown";
+
+                    using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
                     {
-                        cmd.Parameters.AddWithValue("@username", username);
-                        using (var adapter = new SqlDataAdapter(cmd))
+                        try
                         {
-                            adapter.Fill(dataTable);
+                            conn.Open();
+                            adapter.Fill(dt);
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine("Error in GetTasks: " + ex.Message);
                         }
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"GetTasks Error: {ex.Message}");
-            }
-            return dataTable;
+            return dt;
         }
 
         public bool UpdateTask(int taskId, string title, string description, DateTime? reminderDate)
         {
-            try
+            string query = "UPDATE tasks SET title = @title, description = @description, reminder_date = @reminderDate WHERE id = @taskId;";
+
+            using (SqlConnection conn = new SqlConnection(connectionString))
             {
-                using (var conn = new SqlConnection(connectionString))
+                using (SqlCommand cmd = new SqlCommand(query, conn))
                 {
-                    conn.Open();
-                    string query = @"UPDATE tasks 
-                                    SET title = @title, description = @description, reminder_date = @reminderDate 
-                                    WHERE id = @id";
-                    using (var cmd = new SqlCommand(query, conn))
+                    cmd.Parameters.Add("@taskId", SqlDbType.Int).Value = taskId;
+                    cmd.Parameters.Add("@title", SqlDbType.NVarChar, 200).Value = title ?? "";
+                    cmd.Parameters.Add("@description", SqlDbType.NVarChar, -1).Value = description ?? "";
+                    cmd.Parameters.Add("@reminderDate", SqlDbType.DateTime).Value = (object)reminderDate ?? DBNull.Value;
+
+                    try
                     {
-                        cmd.Parameters.AddWithValue("@id", taskId);
-                        cmd.Parameters.AddWithValue("@title", title);
-                        cmd.Parameters.AddWithValue("@description", description ?? "");
-                        cmd.Parameters.AddWithValue("@reminderDate", (object)reminderDate ?? DBNull.Value);
+                        conn.Open();
                         return cmd.ExecuteNonQuery() > 0;
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine("Error in UpdateTask: " + ex.Message);
+                        return false;
                     }
                 }
             }
-            catch { return false; }
         }
 
-        public bool CompleteTask(int taskId)
+        public bool CompleteTask(int taskId, bool isCompleted = true)
         {
-            try
+            string query = "UPDATE tasks SET is_completed = @isCompleted WHERE id = @taskId;";
+
+            using (SqlConnection conn = new SqlConnection(connectionString))
             {
-                using (var conn = new SqlConnection(connectionString))
+                using (SqlCommand cmd = new SqlCommand(query, conn))
                 {
-                    conn.Open();
-                    string query = "UPDATE tasks SET is_completed = 1 WHERE id = @id";
-                    using (var cmd = new SqlCommand(query, conn))
+                    cmd.Parameters.Add("@taskId", SqlDbType.Int).Value = taskId;
+                    cmd.Parameters.Add("@isCompleted", SqlDbType.Bit).Value = isCompleted;
+
+                    try
                     {
-                        cmd.Parameters.AddWithValue("@id", taskId);
+                        conn.Open();
                         return cmd.ExecuteNonQuery() > 0;
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine("Error in CompleteTask: " + ex.Message);
+                        return false;
                     }
                 }
             }
-            catch { return false; }
         }
 
         public bool DeleteTask(int taskId)
         {
-            try
+            string query = "DELETE FROM tasks WHERE id = @taskId;";
+
+            using (SqlConnection conn = new SqlConnection(connectionString))
             {
-                using (var conn = new SqlConnection(connectionString))
+                using (SqlCommand cmd = new SqlCommand(query, conn))
                 {
-                    conn.Open();
-                    string query = "DELETE FROM tasks WHERE id = @id";
-                    using (var cmd = new SqlCommand(query, conn))
+                    cmd.Parameters.Add("@taskId", SqlDbType.Int).Value = taskId;
+
+                    try
                     {
-                        cmd.Parameters.AddWithValue("@id", taskId);
+                        conn.Open();
                         return cmd.ExecuteNonQuery() > 0;
                     }
-                }
-            }
-            catch { return false; }
-        }
-
-        // ============================================
-        // ACTIVITY LOG OPERATIONS
-        // ============================================
-
-        public bool AddActivityLog(string username, string action, string details)
-        {
-            try
-            {
-                using (var conn = new SqlConnection(connectionString))
-                {
-                    conn.Open();
-                    string query = @"INSERT INTO activity_log (username, action, details) 
-                                    VALUES (@username, @action, @details)";
-                    using (var cmd = new SqlCommand(query, conn))
+                    catch (Exception ex)
                     {
-                        cmd.Parameters.AddWithValue("@username", username);
-                        cmd.Parameters.AddWithValue("@action", action);
-                        cmd.Parameters.AddWithValue("@details", details);
-                        return cmd.ExecuteNonQuery() > 0;
+                        System.Diagnostics.Debug.WriteLine("Error in DeleteTask: " + ex.Message);
+                        return false;
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"AddActivityLog Error: {ex.Message}");
-                return false;
-            }
         }
 
-        public DataTable GetRecentActivity(string username, int limit = 10)
-        {
-            var dataTable = new DataTable();
-            try
-            {
-                using (var conn = new SqlConnection(connectionString))
-                {
-                    conn.Open();
-                    string query = @"SELECT TOP (@limit) action, details, timestamp 
-                                    FROM activity_log 
-                                    WHERE username = @username 
-                                    ORDER BY timestamp DESC";
-                    using (var cmd = new SqlCommand(query, conn))
-                    {
-                        cmd.Parameters.AddWithValue("@username", username);
-                        cmd.Parameters.AddWithValue("@limit", limit);
-                        using (var adapter = new SqlDataAdapter(cmd))
-                        {
-                            adapter.Fill(dataTable);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"GetRecentActivity Error: {ex.Message}");
-            }
-            return dataTable;
-        }
-
-        // ✅ ADD THIS METHOD
-        public DataTable GetActivityByDate(string username, DateTime fromDate, DateTime toDate)
-        {
-            var dataTable = new DataTable();
-            try
-            {
-                using (var conn = new SqlConnection(connectionString))
-                {
-                    conn.Open();
-                    string query = @"SELECT action, details, timestamp 
-                                    FROM activity_log 
-                                    WHERE username = @username 
-                                    AND timestamp BETWEEN @fromDate AND @toDate
-                                    ORDER BY timestamp DESC";
-                    using (var cmd = new SqlCommand(query, conn))
-                    {
-                        cmd.Parameters.AddWithValue("@username", username);
-                        cmd.Parameters.AddWithValue("@fromDate", fromDate);
-                        cmd.Parameters.AddWithValue("@toDate", toDate);
-                        using (var adapter = new SqlDataAdapter(cmd))
-                        {
-                            adapter.Fill(dataTable);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"GetActivityByDate Error: {ex.Message}");
-            }
-            return dataTable;
-        }
-
-        // ✅ ADD THIS METHOD
-        public bool ClearActivityLog(string username)
-        {
-            try
-            {
-                using (var conn = new SqlConnection(connectionString))
-                {
-                    conn.Open();
-                    string query = "DELETE FROM activity_log WHERE username = @username";
-                    using (var cmd = new SqlCommand(query, conn))
-                    {
-                        cmd.Parameters.AddWithValue("@username", username);
-                        return cmd.ExecuteNonQuery() > 0;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"ClearActivityLog Error: {ex.Message}");
-                return false;
-            }
-        }
-
-        // ============================================
-        // QUIZ SCORE OPERATIONS
-        // ============================================
+        // ==========================================
+        // QUIZ MANAGEMENT METHODS
+        // ==========================================
 
         public bool SaveQuizScore(string username, int score, int total)
         {
-            try
+            string query = "INSERT INTO quiz_scores (username, score, total) VALUES (@username, @score, @total);";
+
+            using (SqlConnection conn = new SqlConnection(connectionString))
             {
-                using (var conn = new SqlConnection(connectionString))
+                using (SqlCommand cmd = new SqlCommand(query, conn))
                 {
-                    conn.Open();
-                    string query = @"INSERT INTO quiz_scores (username, score, total) 
-                                    VALUES (@username, @score, @total)";
-                    using (var cmd = new SqlCommand(query, conn))
+                    cmd.Parameters.Add("@username", SqlDbType.NVarChar, 100).Value = username ?? "Unknown";
+                    cmd.Parameters.Add("@score", SqlDbType.Int).Value = score;
+                    cmd.Parameters.Add("@total", SqlDbType.Int).Value = total;
+
+                    try
                     {
-                        cmd.Parameters.AddWithValue("@username", username);
-                        cmd.Parameters.AddWithValue("@score", score);
-                        cmd.Parameters.AddWithValue("@total", total);
+                        conn.Open();
                         return cmd.ExecuteNonQuery() > 0;
                     }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"SaveQuizScore Error: {ex.Message}");
-                return false;
-            }
-        }
-
-        public DataTable GetQuizHistory(string username, int limit = 5)
-        {
-            var dataTable = new DataTable();
-            try
-            {
-                using (var conn = new SqlConnection(connectionString))
-                {
-                    conn.Open();
-                    string query = @"SELECT TOP (@limit) score, total, date_taken 
-                                    FROM quiz_scores 
-                                    WHERE username = @username 
-                                    ORDER BY date_taken DESC";
-                    using (var cmd = new SqlCommand(query, conn))
+                    catch (Exception ex)
                     {
-                        cmd.Parameters.AddWithValue("@username", username);
-                        cmd.Parameters.AddWithValue("@limit", limit);
-                        using (var adapter = new SqlDataAdapter(cmd))
-                        {
-                            adapter.Fill(dataTable);
-                        }
+                        System.Diagnostics.Debug.WriteLine("Error in SaveQuizScore: " + ex.Message);
+                        return false;
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"GetQuizHistory Error: {ex.Message}");
-            }
-            return dataTable;
-        }
-
-        public int GetAverageQuizScore(string username)
-        {
-            try
-            {
-                using (var conn = new SqlConnection(connectionString))
-                {
-                    conn.Open();
-                    string query = "SELECT AVG(CAST(score AS DECIMAL)) FROM quiz_scores WHERE username = @username";
-                    using (var cmd = new SqlCommand(query, conn))
-                    {
-                        cmd.Parameters.AddWithValue("@username", username);
-                        var result = cmd.ExecuteScalar();
-                        return result != DBNull.Value ? Convert.ToInt32(result) : 0;
-                    }
-                }
-            }
-            catch { return 0; }
         }
     }
 }

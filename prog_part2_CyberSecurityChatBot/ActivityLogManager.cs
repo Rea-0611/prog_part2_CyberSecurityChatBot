@@ -47,16 +47,35 @@ namespace prog_part2_CyberSecurityChatBot
 
         public string GetLogSummary(int limit = 10)
         {
-            var logs = GetRecentLogs(limit);
-            if (logs.Rows.Count == 0)
+            DataTable logs = GetRecentLogs(limit);
+            
+            // Check if table is null or empty safely
+            if (logs == null || logs.Rows.Count == 0)
                 return "No recent activity to show.";
 
             string summary = "";
             for (int i = 0; i < logs.Rows.Count && i < limit; i++)
             {
-                var row = logs.Rows[i];
-                summary += $"{i + 1}. [{row["timestamp"]}] {row["action"]}: {row["details"]}\n";
+                DataRow row = logs.Rows[i];
+
+                // 1. Safe extraction of the 'timestamp' column from SQL Server
+                string dateStr = "Unknown Time";
+                if (logs.Columns.Contains("timestamp") && row["timestamp"] != DBNull.Value)
+                {
+                    dateStr = Convert.ToDateTime(row["timestamp"]).ToString("yyyy-MM-dd HH:mm:ss");
+                }
+                else if (logs.Columns.Contains("Timestamp") && row["Timestamp"] != DBNull.Value)
+                {
+                    dateStr = Convert.ToDateTime(row["Timestamp"]).ToString("yyyy-MM-dd HH:mm:ss");
+                }
+
+                // 2. Safe extraction of 'action' and 'details' columns
+                string actionStr = logs.Columns.Contains("action") ? row["action"].ToString() : "Unknown Action";
+                string detailsStr = logs.Columns.Contains("details") ? row["details"].ToString() : "";
+
+                summary += $"{i + 1}. [{dateStr}] {actionStr}: {detailsStr}\n";
             }
+            
             return summary.TrimEnd('\n');
         }
     }

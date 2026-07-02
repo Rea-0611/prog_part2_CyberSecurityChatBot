@@ -28,8 +28,6 @@ namespace prog_part2_CyberSecurityChatBot
         {
             InitializeComponent();
 
-
-
             // Initialize managers
             usernameManager = new UsernameManager();
             responseManager = new ResponseManager();
@@ -81,6 +79,13 @@ namespace prog_part2_CyberSecurityChatBot
             // Update UI
             user_greeting.Text = $"Welcome, {username}!";
             AddChatMessage("🤖 CyberBot", $"Welcome, {username}! 🎉");
+
+            // CRUCIAL ADDITION: Write initial launch state to log tables immediately
+            logManager.AddLog("Login", $"User {username} successfully logged into application instance.");
+
+            // Clear visual data structures and load them instantly
+            LoadTasks();
+            LoadActivityLog();
 
             if (isDatabaseConnected)
             {
@@ -151,7 +156,6 @@ namespace prog_part2_CyberSecurityChatBot
             }
 
             error_message.Visibility = Visibility.Collapsed;
-
             username_grid.Visibility = Visibility.Hidden;
             chat_grid.Visibility = Visibility.Visible;
 
@@ -292,8 +296,7 @@ namespace prog_part2_CyberSecurityChatBot
             {
                 AddChatMessage("🤖 CyberBot", $"✅ Task added: '{title}'");
                 logManager.AddLog("Task Added", $"Task: '{title}'");
-                if (MainTabControl.SelectedIndex == 1)
-                    LoadTasks();
+                LoadTasks();
             }
             else
             {
@@ -500,7 +503,7 @@ namespace prog_part2_CyberSecurityChatBot
         {
             try
             {
-                if (!isDatabaseConnected)
+                if (!isDatabaseConnected || logManager == null)
                 {
                     ActivityLogListView.ItemsSource = null;
                     return;
@@ -557,14 +560,17 @@ namespace prog_part2_CyberSecurityChatBot
         private void CompleteTask_Click(object sender, RoutedEventArgs e)
         {
             var button = sender as Button;
-            int taskId = Convert.ToInt32(button.Tag);
+            if (button == null) return;
 
+            int taskId = Convert.ToInt32(button.Tag);
             var task = (DataRowView)button.DataContext;
             string title = task["title"].ToString();
 
-            bool success = taskManager.CompleteTask(taskId, title);
+            // Explicit completion check rule mapping
+            bool success = dbHelper.CompleteTask(taskId, true);
             if (success)
             {
+                logManager?.AddLog("Task Completed", $"Task: '{title}'");
                 LoadTasks();
                 TaskStatus.Text = $"✅ Task completed: '{title}'";
             }
@@ -573,17 +579,19 @@ namespace prog_part2_CyberSecurityChatBot
         private void DeleteTask_Click(object sender, RoutedEventArgs e)
         {
             var button = sender as Button;
-            int taskId = Convert.ToInt32(button.Tag);
+            if (button == null) return;
 
+            int taskId = Convert.ToInt32(button.Tag);
             var task = (DataRowView)button.DataContext;
             string title = task["title"].ToString();
 
             if (MessageBox.Show($"Delete task '{title}'?", "Confirm Delete",
                 MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
             {
-                bool success = taskManager.DeleteTask(taskId, title);
+                bool success = dbHelper.DeleteTask(taskId);
                 if (success)
                 {
+                    logManager?.AddLog("Task Deleted", $"Task: '{title}'");
                     LoadTasks();
                     TaskStatus.Text = $"🗑️ Task deleted: '{title}'";
                 }
@@ -634,15 +642,19 @@ namespace prog_part2_CyberSecurityChatBot
         }
 
         // ============================================
-        // TAB SELECTION
+        // TAB SELECTION (Fixed Event Bubbling)
         // ============================================
 
         private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (MainTabControl.SelectedIndex == 1 && taskManager != null)
-                LoadTasks();
-            else if (MainTabControl.SelectedIndex == 3 && logManager != null)
-                LoadActivityLog();
+            // CRUCIAL: Stops sub-element item row selections from breaking the code loops
+            if (e.OriginalSource is TabControl)
+            {
+                if (MainTabControl.SelectedIndex == 1 && taskManager != null)
+                    LoadTasks();
+                else if (MainTabControl.SelectedIndex == 3 && logManager != null)
+                    LoadActivityLog();
+            }
         }
     }
 }
