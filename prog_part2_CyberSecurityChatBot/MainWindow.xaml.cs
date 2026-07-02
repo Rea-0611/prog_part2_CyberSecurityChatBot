@@ -28,6 +28,8 @@ namespace prog_part2_CyberSecurityChatBot
         {
             InitializeComponent();
 
+
+
             // Initialize managers
             usernameManager = new UsernameManager();
             responseManager = new ResponseManager();
