@@ -1,10 +1,9 @@
-﻿using MySql.Data.MySqlClient;
-using System.Data;
+﻿using Org.BouncyCastle.Tls;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Data;
+using System.Data.SqlClient;
+using System.Runtime.Remoting.Contexts;
+using System.Windows.Markup;
 
 namespace prog_part2_CyberSecurityChatBot
 {
@@ -12,350 +11,340 @@ namespace prog_part2_CyberSecurityChatBot
     {
         private string connectionString;
 
+        public DatabaseHelper()
+        {
+            // UPDATE THIS FOR YOUR SQL SERVER
+            // For Windows Authentication:
+            connectionString = @"(localdb)\MSSQLLocalDB; Initial Catalog = master; Integrated Security = True; Connect Timeout = 30; Encrypt = False; Trust Server Certificate = False; Application Intent = ReadWrite; Multi Subnet Failover = False;";
 
-        
-            public DatabaseHelper()
+            // For SQL Server Authentication:
+            // connectionString = "Server=localhost;Database=cybersecurity_chatbot;User Id=sa;Password=yourpassword;";
+        }
+
+        public bool TestConnection()
+        {
+            try
             {
-                // ⚠️ UPDATE THESE VALUES with your MySQL credentials!
-                string server = "localhost";
-                string database = "cybersecurity_chatbot";
-                string username = "root";
-                string password = "yourpassword"; // Change this!
-                string port = "3306";
-
-                connectionString = $"Server={server};Database={database};Uid={username};Pwd={password};Port={port};";
-            }
-
-            public MySqlConnection GetConnection()
-            {
-                return new MySqlConnection(connectionString);
-            }
-
-            public bool TestConnection()
-            {
-                try
+                using (var conn = new SqlConnection(connectionString))
                 {
-                    using (var conn = GetConnection())
-                    {
-                        conn.Open();
-                        return true;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"DB Connection Error: {ex.Message}");
-                    return false;
+                    conn.Open();
+                    return true;
                 }
             }
-
-            // ============================================
-            // TASK OPERATIONS
-            // ============================================
-
-            public bool AddTask(string username, string title, string description, DateTime? reminderDate)
+            catch (Exception ex)
             {
-                try
+                System.Diagnostics.Debug.WriteLine($"Connection failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        // ============================================
+        // TASK OPERATIONS
+        // ============================================
+
+        public bool AddTask(string username, string title, string description, DateTime? reminderDate)
+        {
+            try
+            {
+                using (var conn = new SqlConnection(connectionString))
                 {
-                    using (var conn = GetConnection())
-                    {
-                        conn.Open();
-                        string query = @"INSERT INTO tasks (username, title, description, reminder_date) 
+                    conn.Open();
+                    string query = @"INSERT INTO tasks (username, title, description, reminder_date) 
                                     VALUES (@username, @title, @description, @reminderDate)";
-                        using (var cmd = new MySqlCommand(query, conn))
+                    using (var cmd = new SqlCommand(query, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@username", username);
+                        cmd.Parameters.AddWithValue("@title", title);
+                        cmd.Parameters.AddWithValue("@description", description ?? "");
+                        cmd.Parameters.AddWithValue("@reminderDate", (object)reminderDate ?? DBNull.Value);
+                        return cmd.ExecuteNonQuery() > 0;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"AddTask Error: {ex.Message}");
+                return false;
+            }
+        }
+
+        public DataTable GetTasks(string username)
+        {
+            var dataTable = new DataTable();
+            try
+            {
+                using (var conn = new SqlConnection(connectionString))
+                {
+                    conn.Open();
+                    string query = @"SELECT id, title, description, reminder_date, is_completed, created_at 
+                                    FROM tasks WHERE username = @username ORDER BY created_at DESC";
+                    using (var cmd = new SqlCommand(query, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@username", username);
+                        using (var adapter = new SqlDataAdapter(cmd))
                         {
-                            cmd.Parameters.AddWithValue("@username", username);
-                            cmd.Parameters.AddWithValue("@title", title);
-                            cmd.Parameters.AddWithValue("@description", description ?? "");
-                            cmd.Parameters.AddWithValue("@reminderDate", (object)reminderDate ?? DBNull.Value);
-                            return cmd.ExecuteNonQuery() > 0;
+                            adapter.Fill(dataTable);
                         }
                     }
                 }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"AddTask Error: {ex.Message}");
-                    return false;
-                }
             }
-
-            public DataTable GetTasks(string username, bool showCompleted = false)
+            catch (Exception ex)
             {
-                try
-                {
-                    using (var conn = GetConnection())
-                    {
-                        conn.Open();
-                        string query = @"SELECT id, title, description, reminder_date, is_completed, created_at 
-                                    FROM tasks WHERE username = @username";
-                        if (!showCompleted)
-                            query += " AND is_completed = FALSE";
-                        query += " ORDER BY created_at DESC";
-
-                        using (var cmd = new MySqlCommand(query, conn))
-                        {
-                            cmd.Parameters.AddWithValue("@username", username);
-                            using (var adapter = new MySqlDataAdapter(cmd))
-                            {
-                                DataTable dt = new DataTable();
-                                adapter.Fill(dt);
-                                return dt;
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"GetTasks Error: {ex.Message}");
-                    return new DataTable();
-                }
+                System.Diagnostics.Debug.WriteLine($"GetTasks Error: {ex.Message}");
             }
+            return dataTable;
+        }
 
-            public bool UpdateTask(int taskId, string title, string description, DateTime? reminderDate)
+        public bool UpdateTask(int taskId, string title, string description, DateTime? reminderDate)
+        {
+            try
             {
-                try
+                using (var conn = new SqlConnection(connectionString))
                 {
-                    using (var conn = GetConnection())
-                    {
-                        conn.Open();
-                        string query = @"UPDATE tasks 
+                    conn.Open();
+                    string query = @"UPDATE tasks 
                                     SET title = @title, description = @description, reminder_date = @reminderDate 
                                     WHERE id = @id";
-                        using (var cmd = new MySqlCommand(query, conn))
-                        {
-                            cmd.Parameters.AddWithValue("@id", taskId);
-                            cmd.Parameters.AddWithValue("@title", title);
-                            cmd.Parameters.AddWithValue("@description", description ?? "");
-                            cmd.Parameters.AddWithValue("@reminderDate", (object)reminderDate ?? DBNull.Value);
-                            return cmd.ExecuteNonQuery() > 0;
-                        }
+                    using (var cmd = new SqlCommand(query, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@id", taskId);
+                        cmd.Parameters.AddWithValue("@title", title);
+                        cmd.Parameters.AddWithValue("@description", description ?? "");
+                        cmd.Parameters.AddWithValue("@reminderDate", (object)reminderDate ?? DBNull.Value);
+                        return cmd.ExecuteNonQuery() > 0;
                     }
                 }
-                catch { return false; }
             }
+            catch { return false; }
+        }
 
-            public bool CompleteTask(int taskId)
+        public bool CompleteTask(int taskId)
+        {
+            try
             {
-                try
+                using (var conn = new SqlConnection(connectionString))
                 {
-                    using (var conn = GetConnection())
+                    conn.Open();
+                    string query = "UPDATE tasks SET is_completed = 1 WHERE id = @id";
+                    using (var cmd = new SqlCommand(query, conn))
                     {
-                        conn.Open();
-                        string query = "UPDATE tasks SET is_completed = TRUE WHERE id = @id";
-                        using (var cmd = new MySqlCommand(query, conn))
-                        {
-                            cmd.Parameters.AddWithValue("@id", taskId);
-                            return cmd.ExecuteNonQuery() > 0;
-                        }
+                        cmd.Parameters.AddWithValue("@id", taskId);
+                        return cmd.ExecuteNonQuery() > 0;
                     }
                 }
-                catch { return false; }
             }
+            catch { return false; }
+        }
 
-            public bool DeleteTask(int taskId)
+        public bool DeleteTask(int taskId)
+        {
+            try
             {
-                try
+                using (var conn = new SqlConnection(connectionString))
                 {
-                    using (var conn = GetConnection())
+                    conn.Open();
+                    string query = "DELETE FROM tasks WHERE id = @id";
+                    using (var cmd = new SqlCommand(query, conn))
                     {
-                        conn.Open();
-                        string query = "DELETE FROM tasks WHERE id = @id";
-                        using (var cmd = new MySqlCommand(query, conn))
-                        {
-                            cmd.Parameters.AddWithValue("@id", taskId);
-                            return cmd.ExecuteNonQuery() > 0;
-                        }
+                        cmd.Parameters.AddWithValue("@id", taskId);
+                        return cmd.ExecuteNonQuery() > 0;
                     }
                 }
-                catch { return false; }
             }
+            catch { return false; }
+        }
 
-            // ============================================
-            // ACTIVITY LOG OPERATIONS
-            // ============================================
+        // ============================================
+        // ACTIVITY LOG OPERATIONS
+        // ============================================
 
-            public bool AddActivityLog(string username, string action, string details)
+        public bool AddActivityLog(string username, string action, string details)
+        {
+            try
             {
-                try
+                using (var conn = new SqlConnection(connectionString))
                 {
-                    using (var conn = GetConnection())
-                    {
-                        conn.Open();
-                        string query = @"INSERT INTO activity_log (username, action, details) 
+                    conn.Open();
+                    string query = @"INSERT INTO activity_log (username, action, details) 
                                     VALUES (@username, @action, @details)";
-                        using (var cmd = new MySqlCommand(query, conn))
-                        {
-                            cmd.Parameters.AddWithValue("@username", username);
-                            cmd.Parameters.AddWithValue("@action", action);
-                            cmd.Parameters.AddWithValue("@details", details);
-                            return cmd.ExecuteNonQuery() > 0;
-                        }
+                    using (var cmd = new SqlCommand(query, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@username", username);
+                        cmd.Parameters.AddWithValue("@action", action);
+                        cmd.Parameters.AddWithValue("@details", details);
+                        return cmd.ExecuteNonQuery() > 0;
                     }
                 }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"AddActivityLog Error: {ex.Message}");
-                    return false;
-                }
             }
-
-            public DataTable GetRecentActivity(string username, int limit = 10)
+            catch (Exception ex)
             {
-                try
+                System.Diagnostics.Debug.WriteLine($"AddActivityLog Error: {ex.Message}");
+                return false;
+            }
+        }
+
+        public DataTable GetRecentActivity(string username, int limit = 10)
+        {
+            var dataTable = new DataTable();
+            try
+            {
+                using (var conn = new SqlConnection(connectionString))
                 {
-                    using (var conn = GetConnection())
-                    {
-                        conn.Open();
-                        string query = @"SELECT id, action, details, timestamp 
+                    conn.Open();
+                    string query = @"SELECT TOP (@limit) action, details, timestamp 
                                     FROM activity_log 
                                     WHERE username = @username 
-                                    ORDER BY timestamp DESC 
-                                    LIMIT @limit";
-                        using (var cmd = new MySqlCommand(query, conn))
+                                    ORDER BY timestamp DESC";
+                    using (var cmd = new SqlCommand(query, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@username", username);
+                        cmd.Parameters.AddWithValue("@limit", limit);
+                        using (var adapter = new SqlDataAdapter(cmd))
                         {
-                            cmd.Parameters.AddWithValue("@username", username);
-                            cmd.Parameters.AddWithValue("@limit", limit);
-                            using (var adapter = new MySqlDataAdapter(cmd))
-                            {
-                                DataTable dt = new DataTable();
-                                adapter.Fill(dt);
-                                return dt;
-                            }
+                            adapter.Fill(dataTable);
                         }
                     }
                 }
-                catch
-                {
-                    return new DataTable();
-                }
             }
-
-            public DataTable GetActivityByDate(string username, DateTime fromDate, DateTime toDate)
+            catch (Exception ex)
             {
-                try
+                System.Diagnostics.Debug.WriteLine($"GetRecentActivity Error: {ex.Message}");
+            }
+            return dataTable;
+        }
+
+        // ✅ ADD THIS METHOD
+        public DataTable GetActivityByDate(string username, DateTime fromDate, DateTime toDate)
+        {
+            var dataTable = new DataTable();
+            try
+            {
+                using (var conn = new SqlConnection(connectionString))
                 {
-                    using (var conn = GetConnection())
-                    {
-                        conn.Open();
-                        string query = @"SELECT action, details, timestamp 
+                    conn.Open();
+                    string query = @"SELECT action, details, timestamp 
                                     FROM activity_log 
                                     WHERE username = @username 
                                     AND timestamp BETWEEN @fromDate AND @toDate
                                     ORDER BY timestamp DESC";
-                        using (var cmd = new MySqlCommand(query, conn))
+                    using (var cmd = new SqlCommand(query, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@username", username);
+                        cmd.Parameters.AddWithValue("@fromDate", fromDate);
+                        cmd.Parameters.AddWithValue("@toDate", toDate);
+                        using (var adapter = new SqlDataAdapter(cmd))
                         {
-                            cmd.Parameters.AddWithValue("@username", username);
-                            cmd.Parameters.AddWithValue("@fromDate", fromDate);
-                            cmd.Parameters.AddWithValue("@toDate", toDate);
-                            using (var adapter = new MySqlDataAdapter(cmd))
-                            {
-                                DataTable dt = new DataTable();
-                                adapter.Fill(dt);
-                                return dt;
-                            }
+                            adapter.Fill(dataTable);
                         }
                     }
-                }
-                catch
-                {
-                    return new DataTable();
                 }
             }
-
-            public bool ClearActivityLog(string username)
+            catch (Exception ex)
             {
-                try
-                {
-                    using (var conn = GetConnection())
-                    {
-                        conn.Open();
-                        string query = "DELETE FROM activity_log WHERE username = @username";
-                        using (var cmd = new MySqlCommand(query, conn))
-                        {
-                            cmd.Parameters.AddWithValue("@username", username);
-                            return cmd.ExecuteNonQuery() > 0;
-                        }
-                    }
-                }
-                catch { return false; }
+                System.Diagnostics.Debug.WriteLine($"GetActivityByDate Error: {ex.Message}");
             }
+            return dataTable;
+        }
 
-            // ============================================
-            // QUIZ SCORE OPERATIONS
-            // ============================================
-
-            public bool SaveQuizScore(string username, int score, int total)
+        // ✅ ADD THIS METHOD
+        public bool ClearActivityLog(string username)
+        {
+            try
             {
-                try
+                using (var conn = new SqlConnection(connectionString))
                 {
-                    using (var conn = GetConnection())
+                    conn.Open();
+                    string query = "DELETE FROM activity_log WHERE username = @username";
+                    using (var cmd = new SqlCommand(query, conn))
                     {
-                        conn.Open();
-                        string query = @"INSERT INTO quiz_scores (username, score, total) 
-                                    VALUES (@username, @score, @total)";
-                        using (var cmd = new MySqlCommand(query, conn))
-                        {
-                            cmd.Parameters.AddWithValue("@username", username);
-                            cmd.Parameters.AddWithValue("@score", score);
-                            cmd.Parameters.AddWithValue("@total", total);
-                            return cmd.ExecuteNonQuery() > 0;
-                        }
+                        cmd.Parameters.AddWithValue("@username", username);
+                        return cmd.ExecuteNonQuery() > 0;
                     }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"SaveQuizScore Error: {ex.Message}");
-                    return false;
                 }
             }
-
-            public DataTable GetQuizHistory(string username, int limit = 5)
+            catch (Exception ex)
             {
-                try
-                {
-                    using (var conn = GetConnection())
-                    {
-                        conn.Open();
-                        string query = @"SELECT score, total, date_taken 
-                                    FROM quiz_scores 
-                                    WHERE username = @username 
-                                    ORDER BY date_taken DESC 
-                                    LIMIT @limit";
-                        using (var cmd = new MySqlCommand(query, conn))
-                        {
-                            cmd.Parameters.AddWithValue("@username", username);
-                            cmd.Parameters.AddWithValue("@limit", limit);
-                            using (var adapter = new MySqlDataAdapter(cmd))
-                            {
-                                DataTable dt = new DataTable();
-                                adapter.Fill(dt);
-                                return dt;
-                            }
-                        }
-                    }
-                }
-                catch
-                {
-                    return new DataTable();
-                }
-            }
-
-            public int GetAverageQuizScore(string username)
-            {
-                try
-                {
-                    using (var conn = GetConnection())
-                    {
-                        conn.Open();
-                        string query = @"SELECT AVG(score) FROM quiz_scores WHERE username = @username";
-                        using (var cmd = new MySqlCommand(query, conn))
-                        {
-                            cmd.Parameters.AddWithValue("@username", username);
-                            var result = cmd.ExecuteScalar();
-                            return result != DBNull.Value ? Convert.ToInt32(result) : 0;
-                        }
-                    }
-                }
-                catch { return 0; }
+                System.Diagnostics.Debug.WriteLine($"ClearActivityLog Error: {ex.Message}");
+                return false;
             }
         }
+
+        // ============================================
+        // QUIZ SCORE OPERATIONS
+        // ============================================
+
+        public bool SaveQuizScore(string username, int score, int total)
+        {
+            try
+            {
+                using (var conn = new SqlConnection(connectionString))
+                {
+                    conn.Open();
+                    string query = @"INSERT INTO quiz_scores (username, score, total) 
+                                    VALUES (@username, @score, @total)";
+                    using (var cmd = new SqlCommand(query, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@username", username);
+                        cmd.Parameters.AddWithValue("@score", score);
+                        cmd.Parameters.AddWithValue("@total", total);
+                        return cmd.ExecuteNonQuery() > 0;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"SaveQuizScore Error: {ex.Message}");
+                return false;
+            }
+        }
+
+        public DataTable GetQuizHistory(string username, int limit = 5)
+        {
+            var dataTable = new DataTable();
+            try
+            {
+                using (var conn = new SqlConnection(connectionString))
+                {
+                    conn.Open();
+                    string query = @"SELECT TOP (@limit) score, total, date_taken 
+                                    FROM quiz_scores 
+                                    WHERE username = @username 
+                                    ORDER BY date_taken DESC";
+                    using (var cmd = new SqlCommand(query, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@username", username);
+                        cmd.Parameters.AddWithValue("@limit", limit);
+                        using (var adapter = new SqlDataAdapter(cmd))
+                        {
+                            adapter.Fill(dataTable);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"GetQuizHistory Error: {ex.Message}");
+            }
+            return dataTable;
+        }
+
+        public int GetAverageQuizScore(string username)
+        {
+            try
+            {
+                using (var conn = new SqlConnection(connectionString))
+                {
+                    conn.Open();
+                    string query = "SELECT AVG(CAST(score AS DECIMAL)) FROM quiz_scores WHERE username = @username";
+                    using (var cmd = new SqlCommand(query, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@username", username);
+                        var result = cmd.ExecuteScalar();
+                        return result != DBNull.Value ? Convert.ToInt32(result) : 0;
+                    }
+                }
+            }
+            catch { return 0; }
+        }
     }
+}
